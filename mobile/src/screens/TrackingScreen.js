@@ -1,0 +1,504 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  SafeAreaView,
+  Dimensions,
+  ActivityIndicator,
+  ScrollView,
+} from 'react-native';
+import MapView, { Marker, Polyline } from 'react-native-maps';
+import Geolocation from 'react-native-geolocation-service';
+import { request, PERMISSIONS, RESULTS } from 'react-native-permissions';
+import BackgroundService from 'react-native-background-actions';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
+
+const { width, height } = Dimensions.get('window');
+
+const colors = {
+  primary: '#3b82f6',
+  secondary: '#64748b',
+  success: '#22c55e',
+  danger: '#ef4444',
+  warning: '#f59e0b',
+  background: '#f8fafc',
+  surface: '#ffffff',
+  text: '#1e293b',
+  textSecondary: '#64748b',
+  border: '#e2e8f0',
+};
+
+const TrackingScreen = () => {
+  const { user } = useAuth();
+  const [isTracking, setIsTracking] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const [routeCoordinates, setRouteCoordinates] = useState([]);
+  const [speed, setSpeed] = useState(0);
+  const [distance, setDistance] = useState(0);
+  const [startTime, setStartTime] = useState(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [permissionsGranted, setPermissionsGranted] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const mapRef = useRef(null);
+  const watchId = useRef(null);
+  const intervalRef = useRef(null);
+  const lastPosition = useRef(null);
+
+  useEffect(() => {
+    requestLocationPermission();
+    return () => {
+      stopTracking();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (startTime && isTracking) {
+      intervalRef.current = setInterval(() => {
+        setElapsedTime(Date.now() - startTime);
+      }, 1000);
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [startTime, isTracking]);
+
+  const requestLocationPermission = async () => {
+    try {
+      const result = await request(
+        Platform.OS === 'ios'
+          ? PERMISSIONS.IOS.LOCATION_WHEN_IN_USE
+          : PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION
+      );
+
+      if (result === RESULTS.GRANTED) {
+        setPermissionsGranted(true);
+        getCurrentLocation();
+      } else {
+        Alert.alert(
+          'Location Permission Required',
+          'This app needs location permission to track your vehicle. Please enable it in settings.',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('Permission error:', error);
+    }
+  };
+
+  const getCurrentLocation = () => {
+    Geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude, speed: currentSpeed } = position.coords;
+        const newLocation = {
+          latitude,
+          longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        };
+
+        setCurrentLocation(newLocation);
+        setSpeed(currentSpeed || 0);
+        lastPosition.current = newLocation;
+      },
+      (error) => {
+        console.error('Location error:', error);
+        Alert.alert('Location Error', 'Unable to get your current location.');
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 10000,
+      }
+    );
+  };
+
+  const startTracking = async () => {
+    if (!permissionsGranted) {
+      Alert.alert('Permission Required', 'Location permission is required for tracking.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const now = Date.now();
+      setStartTime(now);
+      setIsTracking(true);
+      setRouteCoordinates([]);
+      setDistance(0);
+      setElapsedTime(0);
+
+      // Start background service for continuous tracking
+      await BackgroundService.start(veryIntensiveTask, {
+        taskName: 'GPS Tracking',
+        taskTitle: 'Vehicle Tracking Active',
+        taskDesc: 'Tracking your location in the background',
+        taskIcon: {
+          name: 'ic_launcher',
+          type: 'mipmap',
+        },
+        color: colors.primary,
+        linkingURI: 'vehicletracker://tracking',
+      });
+
+      // Start watching position
+      watchId.current = Geolocation.watchPosition(
+        (position) => {
+          handleLocationUpdate(position);
+        },
+        (error) => {
+          console.error('Watch position error:', error);
+        },
+        {
+          enableHighAccuracy: true,
+          distanceFilter: 10, // Update every 10 meters
+          interval: 5000, // Update every 5 seconds
+          fastestInterval: 2000,
+        }
+      );
+
+      Alert.alert('Tracking Started', 'GPS tracking is now active. You can minimize the app.');
+    } catch (error) {
+      console.error('Start tracking error:', error);
+      Alert.alert('Error', 'Failed to start tracking.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const stopTracking = async () => {
+    setIsTracking(false);
+    setStartTime(null);
+
+    if (watchId.current) {
+      Geolocation.clearWatch(watchId.current);
+      watchId.current = null;
+    }
+
+    try {
+      await BackgroundService.stop();
+    } catch (error) {
+      console.error('Stop background service error:', error);
+    }
+  };
+
+  const handleLocationUpdate = async (position) => {
+    const { latitude, longitude, speed: currentSpeed, accuracy } = position.coords;
+
+    const newLocation = {
+      latitude,
+      longitude,
+      latitudeDelta: 0.01,
+      longitudeDelta: 0.01,
+    };
+
+    setCurrentLocation(newLocation);
+    setSpeed(currentSpeed || 0);
+
+    // Add to route
+    setRouteCoordinates(prev => [...prev, newLocation]);
+
+    // Calculate distance
+    if (lastPosition.current) {
+      const newDistance = calculateDistance(
+        lastPosition.current.latitude,
+        lastPosition.current.longitude,
+        latitude,
+        longitude
+      );
+      setDistance(prev => prev + newDistance);
+    }
+
+    lastPosition.current = newLocation;
+
+    // Send to backend
+    try {
+      await axios.post('/api/tracking/gps', {
+        vehicle_id: user.vehicle_id || 1, // Default to vehicle 1 for demo
+        latitude,
+        longitude,
+        speed: currentSpeed || 0,
+        heading: 0, // Could calculate from previous position
+        accuracy,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('Send GPS data error:', error);
+    }
+
+    // Check speed limit (80 km/h = ~22 m/s)
+    if (currentSpeed && currentSpeed > 22) {
+      Alert.alert('Speed Alert', 'You are exceeding the speed limit!');
+    }
+  };
+
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a =
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c; // Distance in km
+  };
+
+  const formatTime = (milliseconds) => {
+    const seconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+
+    return `${hours.toString().padStart(2, '0')}:${(minutes % 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
+  };
+
+  const formatDistance = (km) => {
+    return km < 1 ? `${(km * 1000).toFixed(0)}m` : `${km.toFixed(2)}km`;
+  };
+
+  // Background task for continuous GPS tracking
+  const veryIntensiveTask = async (taskDataArguments) => {
+    const { delay } = taskDataArguments;
+    await new Promise(async (resolve) => {
+      // Keep the service alive
+      for (let i = 0; BackgroundService.isRunning(); i++) {
+        // Send heartbeat to keep service alive
+        await new Promise(resolve => setTimeout(resolve, delay || 5000));
+      }
+    });
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Map View */}
+      <View style={styles.mapContainer}>
+        {currentLocation ? (
+          <MapView
+            ref={mapRef}
+            style={styles.map}
+            initialRegion={currentLocation}
+            showsUserLocation={true}
+            followsUserLocation={true}
+            showsMyLocationButton={true}
+            zoomEnabled={true}
+            scrollEnabled={true}
+          >
+            {routeCoordinates.length > 1 && (
+              <Polyline
+                coordinates={routeCoordinates}
+                strokeColor={colors.primary}
+                strokeWidth={4}
+              />
+            )}
+
+            {currentLocation && (
+              <Marker
+                coordinate={currentLocation}
+                title="Current Location"
+                description={`Speed: ${(speed * 3.6).toFixed(1)} km/h`}
+              >
+                <View style={styles.markerContainer}>
+                  <Icon name="directions-car" size={24} color={colors.primary} />
+                </View>
+              </Marker>
+            )}
+          </MapView>
+        ) : (
+          <View style={styles.mapPlaceholder}>
+            <Icon name="location-off" size={50} color={colors.textSecondary} />
+            <Text style={styles.placeholderText}>Location not available</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={getCurrentLocation}>
+              <Text style={styles.retryButtonText}>Get Location</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
+      {/* Tracking Controls */}
+      <View style={styles.controlsContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statsContainer}>
+          <View style={styles.statCard}>
+            <Icon name="speed" size={20} color={colors.primary} />
+            <Text style={styles.statValue}>{(speed * 3.6).toFixed(1)}</Text>
+            <Text style={styles.statLabel}>km/h</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <Icon name="straighten" size={20} color={colors.success} />
+            <Text style={styles.statValue}>{formatDistance(distance)}</Text>
+            <Text style={styles.statLabel}>Distance</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <Icon name="schedule" size={20} color={colors.warning} />
+            <Text style={styles.statValue}>{formatTime(elapsedTime)}</Text>
+            <Text style={styles.statLabel}>Time</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <Icon name="gps-fixed" size={20} color={isTracking ? colors.success : colors.secondary} />
+            <Text style={[styles.statValue, { color: isTracking ? colors.success : colors.secondary }]}>
+              {isTracking ? 'Active' : 'Stopped'}
+            </Text>
+            <Text style={styles.statLabel}>Status</Text>
+          </View>
+        </ScrollView>
+
+        <View style={styles.buttonContainer}>
+          {!isTracking ? (
+            <TouchableOpacity
+              style={[styles.trackButton, styles.startButton]}
+              onPress={startTracking}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <>
+                  <Icon name="play-arrow" size={24} color="#ffffff" />
+                  <Text style={styles.trackButtonText}>Start Tracking</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.trackButton, styles.stopButton]}
+              onPress={stopTracking}
+            >
+              <Icon name="stop" size={24} color="#ffffff" />
+              <Text style={styles.trackButtonText}>Stop Tracking</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  mapContainer: {
+    flex: 1,
+  },
+  map: {
+    width: '100%',
+    height: '100%',
+  },
+  mapPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+  },
+  placeholderText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontWeight: 'bold',
+  },
+  controlsContainer: {
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  statsContainer: {
+    padding: 15,
+  },
+  statCard: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 15,
+    marginRight: 10,
+    alignItems: 'center',
+    minWidth: 80,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginTop: 5,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  buttonContainer: {
+    padding: 15,
+  },
+  trackButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  startButton: {
+    backgroundColor: colors.success,
+  },
+  stopButton: {
+    backgroundColor: colors.danger,
+  },
+  trackButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  markerContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 5,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+});
+
+export default TrackingScreen;
