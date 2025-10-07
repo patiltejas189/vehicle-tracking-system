@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FaPlus, FaSearch, FaFilter, FaDownload, FaEdit, FaTrash, FaTimes, FaUser, FaSpinner, FaUserShield, FaUserTie, FaUserCheck, FaEye, FaEyeSlash } from 'react-icons/fa';
 
+const API_BASE = (import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`).replace(/\/$/, '');
+
 const Users = () => {
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
@@ -50,7 +52,7 @@ const Users = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/users');
+      const response = await axios.get(`${API_BASE}/api/users`);
       setUsers(response.data);
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -63,9 +65,9 @@ const Users = () => {
     e.preventDefault();
     try {
       if (editingUser) {
-        await axios.put(`http://localhost:5000/api/users/${editingUser.id}`, formData);
+        await axios.put(`${API_BASE}/api/users/${editingUser.id}`, formData);
       } else {
-        await axios.post('http://localhost:5000/api/users', formData);
+        await axios.post(`${API_BASE}/api/users`, formData);
       }
       setFormData({ username: '', email: '', password: '', role: 'driver', status: 'active' });
       setShowForm(false);
@@ -115,7 +117,7 @@ const Users = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
       try {
-        await axios.delete(`http://localhost:5000/api/users/${id}`);
+        await axios.delete(`${API_BASE}/api/users/${id}`);
         fetchUsers();
       } catch (error) {
         console.error('Error deleting user:', error);
