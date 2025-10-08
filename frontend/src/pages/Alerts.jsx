@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import API_BASE from '../api';
 import { Bar, Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -76,7 +77,7 @@ const Alerts = () => {
 
   const fetchAlerts = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/alerts');
+      const response = await axios.get(`${API_BASE}/api/alerts`);
       setAlerts(response.data);
     } catch (error) {
       console.error('Error fetching alerts:', error);
@@ -87,7 +88,7 @@ const Alerts = () => {
 
   const updateAlertStatus = async (id, resolved) => {
     try {
-      await axios.put(`http://localhost:5000/api/alerts/${id}`, { resolved });
+      await axios.put(`${API_BASE}/api/alerts/${id}`, { resolved });
       fetchAlerts();
     } catch (error) {
       console.error('Error updating alert status:', error);
