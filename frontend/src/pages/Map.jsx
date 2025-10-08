@@ -4,7 +4,6 @@ import 'leaflet/dist/leaflet.css';
 import axios from 'axios';
 import io from 'socket.io-client';
 import L from 'leaflet';
-import 'leaflet-routing-machine';
 import { FaSpinner } from 'react-icons/fa';
 import API_BASE from '../api';
 
