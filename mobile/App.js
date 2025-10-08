@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar, View } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import MapView from 'react-native-maps';
 
 // Import screens
 import LoginScreen from './src/screens/LoginScreen';
@@ -149,4 +150,12 @@ export default function App() {
       <AppContent />
     </AuthProvider>
   );
+}
+
+// Configure MapView provider for proper map rendering
+if (MapView) {
+  // Set up map provider - this ensures maps work on both platforms
+  // You may need to add your Google Maps API key in android/app/src/main/AndroidManifest.xml
+  // and ios/YourProjectName/AppDelegate.m for full functionality
+  MapView.setProvider && MapView.setProvider('google'); // or 'mapbox' if you prefer
 }

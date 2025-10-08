@@ -105,21 +105,26 @@ const TrackingScreen = () => {
         const newLocation = {
           latitude,
           longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
+          latitudeDelta: 0.005, // Smaller delta for better zoom
+          longitudeDelta: 0.005,
         };
 
         setCurrentLocation(newLocation);
         setSpeed(currentSpeed || 0);
         lastPosition.current = newLocation;
+
+        // Animate to current location
+        if (mapRef.current) {
+          mapRef.current.animateToRegion(newLocation, 1000);
+        }
       },
       (error) => {
         console.error('Location error:', error);
-        Alert.alert('Location Error', 'Unable to get your current location.');
+        Alert.alert('Location Error', 'Unable to get your current location. Please check your GPS settings.');
       },
       {
         enableHighAccuracy: true,
-        timeout: 15000,
+        timeout: 20000,
         maximumAge: 10000,
       }
     );
@@ -303,13 +308,19 @@ const TrackingScreen = () => {
             ref={mapRef}
             style={styles.map}
             initialRegion={currentLocation}
+            region={currentLocation}
             showsUserLocation={true}
             followsUserLocation={isTracking}
             showsMyLocationButton={true}
+            showsCompass={true}
+            showsScale={true}
             zoomEnabled={true}
             scrollEnabled={true}
             rotateEnabled={true}
             pitchEnabled={false}
+            loadingEnabled={true}
+            loadingIndicatorColor={colors.primary}
+            loadingBackgroundColor={colors.background}
           >
             {routeCoordinates.length > 1 && (
               <Polyline
@@ -468,9 +479,11 @@ const styles = StyleSheet.create({
   mapContainer: {
     flex: 1,
     position: 'relative',
+    backgroundColor: colors.background,
   },
   map: {
     ...StyleSheet.absoluteFillObject,
+    minHeight: height * 0.6, // Ensure minimum height for proper display
   },
   mapPlaceholder: {
     ...StyleSheet.absoluteFillObject,
