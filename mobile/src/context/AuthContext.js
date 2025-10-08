@@ -3,8 +3,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
 // API base URL configuration
+// For development on emulator/device, replace with your computer's IP address
+// For production, replace with your deployed backend URL
 const API_BASE_URL = __DEV__
-  ? 'http://192.168.0.106:5000' // Development - change to your computer's IP
+  ? 'http://10.0.2.2:5000' // Android emulator default IP (change to your computer's IP for physical device)
   : 'https://your-backend.onrender.com'; // Production - replace with your deployed backend URL
 
 const AuthContext = createContext();
