@@ -7,7 +7,7 @@ import axios from 'axios';
 // For production, replace with your deployed backend URL
 const API_BASE_URL = __DEV__
   ? 'http://10.0.2.2:5000' // Android emulator default IP (change to your computer's IP for physical device)
-  : 'https://your-backend.onrender.com'; // Production - replace with your deployed backend URL
+  : 'https://vehicle-tracking-backend-prlb.onrender.com'; // Production - deployed backend URL
 
 const AuthContext = createContext();
 

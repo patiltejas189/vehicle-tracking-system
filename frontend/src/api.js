@@ -1,3 +1,3 @@
-const API_BASE = (import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`).replace(/\/$/, '');
+const API_BASE = (import.meta.env.VITE_API_URL || 'https://vehicle-tracking-backend-prlb.onrender.com').replace(/\/$/, '');
 
 export default API_BASE;
