@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Bar, Line, Pie, Doughnut } from 'react-chartjs-2';
+
+const API_BASE = (import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`).replace(/\/$/, '');
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -47,9 +49,9 @@ const Analytics = () => {
   const fetchAnalyticsData = async () => {
     try {
       const [vehiclesRes, alertsRes, maintenanceRes] = await Promise.all([
-        axios.get('http://localhost:5000/api/vehicles'),
-        axios.get('http://localhost:5000/api/alerts'),
-        axios.get('http://localhost:5000/api/maintenance')
+        axios.get(`${API_BASE}/api/vehicles`),
+        axios.get(`${API_BASE}/api/alerts`),
+        axios.get(`${API_BASE}/api/maintenance`)
       ]);
 
       setAnalyticsData({

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+
+const API_BASE = (import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`).replace(/\/$/, '');
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -52,7 +54,7 @@ const Maintenance = () => {
 
   const fetchMaintenanceData = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/maintenance');
+      const response = await axios.get(`${API_BASE}/api/maintenance`);
       setMaintenanceData(response.data);
     } catch (error) {
       console.error('Error fetching maintenance data:', error);
@@ -63,7 +65,7 @@ const Maintenance = () => {
 
   const fetchVehicles = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/vehicles');
+      const response = await axios.get(`${API_BASE}/api/vehicles`);
       setVehicles(response.data);
     } catch (error) {
       console.error('Error fetching vehicles:', error);
@@ -104,7 +106,7 @@ const Maintenance = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:5000/api/maintenance', formData);
+      await axios.post(`${API_BASE}/api/maintenance`, formData);
       setFormData({
         vehicle_id: '',
         maintenance_type: 'oil_change',
@@ -122,7 +124,7 @@ const Maintenance = () => {
 
   const updateMaintenanceStatus = async (id, status) => {
     try {
-      await axios.put(`http://localhost:5000/api/maintenance/${id}`, { status });
+      await axios.put(`${API_BASE}/api/maintenance/${id}`, { status });
       fetchMaintenanceData();
     } catch (error) {
       console.error('Error updating maintenance status:', error);
