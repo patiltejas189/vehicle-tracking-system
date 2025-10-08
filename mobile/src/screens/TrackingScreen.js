@@ -282,6 +282,20 @@ const TrackingScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <Icon name="gps-fixed" size={24} color={colors.primary} />
+          <Text style={styles.headerTitle}>GPS Tracking</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.headerButton}
+          onPress={getCurrentLocation}
+        >
+          <Icon name="my-location" size={20} color={colors.primary} />
+        </TouchableOpacity>
+      </View>
+
       {/* Map View */}
       <View style={styles.mapContainer}>
         {currentLocation ? (
@@ -290,16 +304,19 @@ const TrackingScreen = () => {
             style={styles.map}
             initialRegion={currentLocation}
             showsUserLocation={true}
-            followsUserLocation={true}
+            followsUserLocation={isTracking}
             showsMyLocationButton={true}
             zoomEnabled={true}
             scrollEnabled={true}
+            rotateEnabled={true}
+            pitchEnabled={false}
           >
             {routeCoordinates.length > 1 && (
               <Polyline
                 coordinates={routeCoordinates}
                 strokeColor={colors.primary}
                 strokeWidth={4}
+                lineDashPattern={[1]}
               />
             )}
 
@@ -317,45 +334,76 @@ const TrackingScreen = () => {
           </MapView>
         ) : (
           <View style={styles.mapPlaceholder}>
-            <Icon name="location-off" size={50} color={colors.textSecondary} />
-            <Text style={styles.placeholderText}>Location not available</Text>
+            <Icon name="location-off" size={64} color={colors.textSecondary} />
+            <Text style={styles.placeholderTitle}>Location Unavailable</Text>
+            <Text style={styles.placeholderText}>Please enable location services to start tracking</Text>
             <TouchableOpacity style={styles.retryButton} onPress={getCurrentLocation}>
+              <Icon name="refresh" size={20} color="#ffffff" />
               <Text style={styles.retryButtonText}>Get Location</Text>
             </TouchableOpacity>
           </View>
         )}
       </View>
 
-      {/* Tracking Controls */}
-      <View style={styles.controlsContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.statsContainer}>
+      {/* Stats Overlay */}
+      {isTracking && (
+        <View style={styles.statsOverlay}>
+          <View style={styles.statsRow}>
+            <View style={styles.miniStat}>
+              <Icon name="speed" size={16} color={colors.primary} />
+              <Text style={styles.miniStatValue}>{(speed * 3.6).toFixed(1)}</Text>
+              <Text style={styles.miniStatLabel}>km/h</Text>
+            </View>
+            <View style={styles.miniStat}>
+              <Icon name="straighten" size={16} color={colors.success} />
+              <Text style={styles.miniStatValue}>{formatDistance(distance)}</Text>
+              <Text style={styles.miniStatLabel}>Distance</Text>
+            </View>
+            <View style={styles.miniStat}>
+              <Icon name="schedule" size={16} color={colors.warning} />
+              <Text style={styles.miniStatValue}>{formatTime(elapsedTime)}</Text>
+              <Text style={styles.miniStatLabel}>Time</Text>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Bottom Controls */}
+      <View style={styles.bottomContainer}>
+        {/* Detailed Stats */}
+        <View style={styles.statsGrid}>
           <View style={styles.statCard}>
-            <Icon name="speed" size={20} color={colors.primary} />
+            <Icon name="speed" size={24} color={colors.primary} />
             <Text style={styles.statValue}>{(speed * 3.6).toFixed(1)}</Text>
-            <Text style={styles.statLabel}>km/h</Text>
+            <Text style={styles.statLabel}>Speed</Text>
+            <Text style={styles.statUnit}>km/h</Text>
           </View>
 
           <View style={styles.statCard}>
-            <Icon name="straighten" size={20} color={colors.success} />
+            <Icon name="straighten" size={24} color={colors.success} />
             <Text style={styles.statValue}>{formatDistance(distance)}</Text>
             <Text style={styles.statLabel}>Distance</Text>
+            <Text style={styles.statUnit}>Travelled</Text>
           </View>
 
           <View style={styles.statCard}>
-            <Icon name="schedule" size={20} color={colors.warning} />
+            <Icon name="schedule" size={24} color={colors.warning} />
             <Text style={styles.statValue}>{formatTime(elapsedTime)}</Text>
-            <Text style={styles.statLabel}>Time</Text>
+            <Text style={styles.statLabel}>Duration</Text>
+            <Text style={styles.statUnit}>Time</Text>
           </View>
 
           <View style={styles.statCard}>
-            <Icon name="gps-fixed" size={20} color={isTracking ? colors.success : colors.secondary} />
+            <Icon name="gps-fixed" size={24} color={isTracking ? colors.success : colors.secondary} />
             <Text style={[styles.statValue, { color: isTracking ? colors.success : colors.secondary }]}>
               {isTracking ? 'Active' : 'Stopped'}
             </Text>
             <Text style={styles.statLabel}>Status</Text>
+            <Text style={styles.statUnit}>Tracking</Text>
           </View>
-        </ScrollView>
+        </View>
 
+        {/* Control Button */}
         <View style={styles.buttonContainer}>
           {!isTracking ? (
             <TouchableOpacity
@@ -364,10 +412,10 @@ const TrackingScreen = () => {
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator color="#ffffff" />
+                <ActivityIndicator color="#ffffff" size="small" />
               ) : (
                 <>
-                  <Icon name="play-arrow" size={24} color="#ffffff" />
+                  <Icon name="play-arrow" size={28} color="#ffffff" />
                   <Text style={styles.trackButtonText}>Start Tracking</Text>
                 </>
               )}
@@ -377,7 +425,7 @@ const TrackingScreen = () => {
               style={[styles.trackButton, styles.stopButton]}
               onPress={stopTracking}
             >
-              <Icon name="stop" size={24} color="#ffffff" />
+              <Icon name="stop" size={28} color="#ffffff" />
               <Text style={styles.trackButtonText}>Stop Tracking</Text>
             </TouchableOpacity>
           )}
@@ -392,87 +440,168 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginLeft: 10,
+  },
+  headerButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: colors.background,
+  },
   mapContainer: {
     flex: 1,
+    position: 'relative',
   },
   map: {
-    width: '100%',
-    height: '100%',
+    ...StyleSheet.absoluteFillObject,
   },
   mapPlaceholder: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.surface,
+    paddingHorizontal: 40,
+  },
+  placeholderTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginTop: 20,
+    marginBottom: 10,
+    textAlign: 'center',
   },
   placeholderText: {
     fontSize: 16,
     color: colors.textSecondary,
-    marginTop: 10,
-    marginBottom: 20,
+    textAlign: 'center',
+    marginBottom: 30,
+    lineHeight: 22,
   },
   retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: colors.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   retryButtonText: {
     color: '#ffffff',
+    fontSize: 16,
     fontWeight: 'bold',
+    marginLeft: 8,
   },
-  controlsContainer: {
+  statsOverlay: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
+    right: 20,
+    zIndex: 1000,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 12,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  miniStat: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  miniStatValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginTop: 2,
+  },
+  miniStatLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 1,
+  },
+  bottomContainer: {
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
-  statsContainer: {
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     padding: 15,
   },
   statCard: {
     backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: 15,
-    marginRight: 10,
+    borderRadius: 16,
+    padding: 16,
+    margin: 6,
     alignItems: 'center',
-    minWidth: 80,
+    width: (width - 60) / 2, // 2 cards per row with margins
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   statValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: colors.text,
-    marginTop: 5,
+    marginTop: 8,
   },
   statLabel: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  statUnit: {
     fontSize: 12,
     color: colors.textSecondary,
     marginTop: 2,
   },
   buttonContainer: {
-    padding: 15,
+    padding: 20,
+    paddingTop: 0,
   },
   trackButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 15,
-    borderRadius: 12,
+    paddingVertical: 18,
+    borderRadius: 16,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   startButton: {
     backgroundColor: colors.success,
@@ -482,22 +611,21 @@ const styles = StyleSheet.create({
   },
   trackButtonText: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginLeft: 8,
+    marginLeft: 12,
   },
   markerContainer: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 5,
+    borderRadius: 24,
+    padding: 8,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 4,
+    borderWidth: 2,
+    borderColor: colors.primary,
   },
 });
 

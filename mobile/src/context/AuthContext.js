@@ -2,8 +2,10 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
-// API base URL - change this to your backend URL
-const API_BASE_URL = 'http://192.168.0.106:5000'; // Change to your computer's IP
+// API base URL configuration
+const API_BASE_URL = __DEV__
+  ? 'http://192.168.0.106:5000' // Development - change to your computer's IP
+  : 'https://your-backend.onrender.com'; // Production - replace with your deployed backend URL
 
 const AuthContext = createContext();
 
