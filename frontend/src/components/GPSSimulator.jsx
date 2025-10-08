@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { FaPlay, FaStop, FaMapMarkerAlt, FaTachometerAlt, FaCog } from 'react-icons/fa';
 
+const API_BASE = (import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`).replace(/\/$/, '');
+
 const GPSSimulator = ({ vehicleId, onLocationUpdate }) => {
   const [isSimulating, setIsSimulating] = useState(false);
   const [currentLocation, setCurrentLocation] = useState({
@@ -79,7 +81,7 @@ const GPSSimulator = ({ vehicleId, onLocationUpdate }) => {
   const sendSimulatedGPS = async (location) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.post('http://localhost:5000/api/tracking/gps', {
+      await axios.post(`${API_BASE}/api/tracking/gps`, {
         vehicle_id: vehicleId,
         latitude: location.latitude,
         longitude: location.longitude,

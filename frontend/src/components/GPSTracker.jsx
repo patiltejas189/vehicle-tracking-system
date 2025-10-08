@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { FaPlay, FaStop, FaMapMarkerAlt, FaTachometerAlt, FaRoute, FaClock } from 'react-icons/fa';
 
+const API_BASE = (import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`).replace(/\/$/, '');
+
 const GPSTracker = ({ assignedVehicle }) => {
   const [isTracking, setIsTracking] = useState(false);
   const [currentLocation, setCurrentLocation] = useState(null);
@@ -80,7 +82,7 @@ const GPSTracker = ({ assignedVehicle }) => {
     };
 
     try {
-      await axios.post('http://localhost:5000/api/tracking/gps', gpsData);
+      await axios.post(`${API_BASE}/api/tracking/gps`, gpsData);
       console.log('GPS data sent successfully');
     } catch (error) {
       console.error('Error sending GPS data:', error);
