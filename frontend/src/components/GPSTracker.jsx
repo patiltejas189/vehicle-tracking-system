@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { FaPlay, FaStop, FaMapMarkerAlt, FaTachometerAlt, FaRoute, FaClock } from 'react-icons/fa';
-
-const API_BASE = (import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`).replace(/\/$/, '');
+import API_BASE from '../api';
 
 const GPSTracker = ({ assignedVehicle }) => {
   const [isTracking, setIsTracking] = useState(false);

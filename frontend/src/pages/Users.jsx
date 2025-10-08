@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { FaPlus, FaSearch, FaFilter, FaDownload, FaEdit, FaTrash, FaTimes, FaUser, FaSpinner, FaUserShield, FaUserTie, FaUserCheck, FaEye, FaEyeSlash } from 'react-icons/fa';
-
-const API_BASE = (import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`).replace(/\/$/, '');
+import API_BASE from '../api';
 
 const Users = () => {
   const [users, setUsers] = useState([]);
