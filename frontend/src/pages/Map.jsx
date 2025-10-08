@@ -5,6 +5,7 @@ import axios from 'axios';
 import io from 'socket.io-client';
 import L from 'leaflet';
 import { FaSpinner } from 'react-icons/fa';
+import API_BASE from '../api';
 
 // Fix for default markers in react-leaflet
 delete L.Icon.Default.prototype._getIconUrl;
@@ -60,7 +61,7 @@ const Map = () => {
     ]);
 
     // Connect to socket for real-time updates with auto-reconnect
-    const socket = io('http://localhost:5000', {
+    const socket = io(API_BASE, {
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
@@ -110,11 +111,11 @@ const Map = () => {
   const fetchVehicleLocations = async () => {
     try {
       // Fetch all vehicles for dropdown
-      const vehiclesResponse = await axios.get('http://localhost:5000/api/vehicles');
+      const vehiclesResponse = await axios.get(`${API_BASE}/api/vehicles`);
       setAllVehicles(vehiclesResponse.data);
 
       // Fetch latest GPS data for map markers
-      const gpsResponse = await axios.get('http://localhost:5000/api/tracking/latest');
+      const gpsResponse = await axios.get(`${API_BASE}/api/tracking/latest`);
 
       // Merge vehicle info with GPS data
       const vehiclesWithGPS = gpsResponse.data.map(gps => {
@@ -130,7 +131,7 @@ const Map = () => {
       console.error('Error fetching vehicle data:', error);
       // Fallback: try to get vehicles even if GPS fails
       try {
-        const vehiclesResponse = await axios.get('http://localhost:5000/api/vehicles');
+        const vehiclesResponse = await axios.get(`${API_BASE}/api/vehicles`);
         setAllVehicles(vehiclesResponse.data);
         setVehicles([]); // No GPS data available
       } catch (fallbackError) {
@@ -145,7 +146,7 @@ const Map = () => {
     if (!selectedVehicle || !selectedDate) return;
 
     try {
-      const response = await axios.get(`http://localhost:5000/api/tracking/route/${selectedVehicle}?date=${selectedDate}`);
+      const response = await axios.get(`${API_BASE}/api/tracking/route/${selectedVehicle}?date=${selectedDate}`);
       const routePoints = response.data.map(point => [point.latitude, point.longitude]);
       setRoute(routePoints);
       setShowRoute(true);
