@@ -2,6 +2,8 @@
 
 This guide covers deploying the Vehicle Tracking Management System to production using Vercel, Render, and Neon.
 
+**Last updated:** October 8, 2025 - All API URLs fixed for production deployment.
+
 ## 📋 Prerequisites
 
 - GitHub account
@@ -61,7 +63,7 @@ This guide covers deploying the Vehicle Tracking Management System to production
    - **Build Command**: `npm run build`
    - **Output Directory**: `dist`
 5. Add environment variable:
-   - `VITE_API_URL`: `https://vehicle-tracking-backend.onrender.com`
+   - `VITE_API_URL`: `https://your-backend.onrender.com`
 6. Deploy
 
 ## 🔧 Step 5: Update Environment Variables
@@ -78,27 +80,23 @@ After all services are deployed, update the URLs:
 ## 🧪 Step 6: Test Deployment
 
 1. Visit your Vercel frontend URL
-2. Try logging in with default credentials:
+2. Login with default credentials:
    - Username: `admin`
-   - Password: `admin123` (or check backend/generate-hashes.js for actual hash)
+   - Password: `admin123`
 3. Test all features
 
 ## 📁 Project Structure for GitHub
 
 ```
-vehicle-tracking-management-system/
-├── backend/
-│   ├── .env.example
-│   ├── render.yaml
-│   └── ... (other backend files)
-├── frontend/
-│   ├── .env.example
-│   ├── vercel.json
-│   └── ... (other frontend files)
-├── ml-service/
-│   ├── render.yaml
-│   └── ... (other ML files)
-└── README.md
+vehicle-tracking-system/
+├── backend/          # Node.js API
+├── frontend/         # React PWA
+├── ml-service/       # Python FastAPI
+├── mobile/           # React Native app
+├── electron/         # Desktop app
+├── docs/             # Documentation
+├── DEPLOYMENT.md     # Production guide
+└── README.md         # Project overview
 ```
 
 ## 🚀 GitHub Setup Instructions
@@ -143,6 +141,10 @@ vehicle-tracking-management-system/
 ### API Calls Failing
 - Confirm `VITE_API_URL` in frontend matches Render backend URL
 - Check browser network tab for errors
+
+### Authentication Issues
+- Clear localStorage and re-login on production
+- Ensure JWT_SECRET is set in production
 
 ## 📞 Support
 
