@@ -44,6 +44,11 @@ const TrackingScreen = () => {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [permissionsGranted, setPermissionsGranted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showRouteView, setShowRouteView] = useState(false);
+  const [selectedVehicle, setSelectedVehicle] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
+  const [historicalRoute, setHistoricalRoute] = useState([]);
+  const [allVehicles, setAllVehicles] = useState([]);
 
   const mapRef = useRef(null);
   const watchId = useRef(null);
@@ -273,6 +278,60 @@ const TrackingScreen = () => {
     return km < 1 ? `${(km * 1000).toFixed(0)}m` : `${km.toFixed(2)}km`;
   };
 
+  const fetchVehicles = async () => {
+    try {
+      const response = await axios.get('/api/vehicles');
+      setAllVehicles(response.data);
+    } catch (error) {
+      console.error('Error fetching vehicles:', error);
+    }
+  };
+
+  const fetchHistoricalRoute = async () => {
+    if (!selectedVehicle || !selectedDate) {
+      Alert.alert('Missing Information', 'Please select both vehicle and date.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await axios.get(`/api/tracking/route/${selectedVehicle}?date=${selectedDate}`);
+
+      if (response.data && response.data.length > 0) {
+        // Convert backend data to map coordinates
+        const routePoints = response.data.map(point => ({
+          latitude: point.latitude,
+          longitude: point.longitude,
+        }));
+
+        setHistoricalRoute(routePoints);
+        setShowRouteView(true);
+
+        // Fit map to show the entire route
+        if (mapRef.current && routePoints.length > 1) {
+          mapRef.current.fitToCoordinates(routePoints, {
+            edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+            animated: true,
+          });
+        }
+      } else {
+        Alert.alert('No Route Data', 'No route data found for the selected vehicle and date.');
+      }
+    } catch (error) {
+      console.error('Error fetching historical route:', error);
+      Alert.alert('Error', 'Failed to fetch route data. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearHistoricalRoute = () => {
+    setHistoricalRoute([]);
+    setShowRouteView(false);
+    setSelectedVehicle('');
+    setSelectedDate('');
+  };
+
   // Background task for continuous GPS tracking
   const veryIntensiveTask = async (taskDataArguments) => {
     const { delay } = taskDataArguments;
@@ -291,14 +350,31 @@ const TrackingScreen = () => {
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <Icon name="gps-fixed" size={24} color={colors.primary} />
-          <Text style={styles.headerTitle}>GPS Tracking</Text>
+          <Text style={styles.headerTitle}>
+            {showRouteView ? 'Route History' : 'GPS Tracking'}
+          </Text>
         </View>
-        <TouchableOpacity
-          style={styles.headerButton}
-          onPress={getCurrentLocation}
-        >
-          <Icon name="my-location" size={20} color={colors.primary} />
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => {
+              if (showRouteView) {
+                clearHistoricalRoute();
+              } else {
+                setShowRouteView(true);
+                fetchVehicles();
+              }
+            }}
+          >
+            <Icon name={showRouteView ? "gps-fixed" : "timeline"} size={20} color={colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={getCurrentLocation}
+          >
+            <Icon name="my-location" size={20} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Map View */}
@@ -322,7 +398,8 @@ const TrackingScreen = () => {
             loadingIndicatorColor={colors.primary}
             loadingBackgroundColor={colors.background}
           >
-            {routeCoordinates.length > 1 && (
+            {/* Live tracking route */}
+            {routeCoordinates.length > 1 && !showRouteView && (
               <Polyline
                 coordinates={routeCoordinates}
                 strokeColor={colors.primary}
@@ -331,7 +408,17 @@ const TrackingScreen = () => {
               />
             )}
 
-            {currentLocation && (
+            {/* Historical route */}
+            {historicalRoute.length > 1 && showRouteView && (
+              <Polyline
+                coordinates={historicalRoute}
+                strokeColor={colors.danger}
+                strokeWidth={5}
+              />
+            )}
+
+            {/* Current location marker (only in live tracking mode) */}
+            {currentLocation && !showRouteView && (
               <Marker
                 coordinate={currentLocation}
                 title="Current Location"
@@ -339,6 +426,32 @@ const TrackingScreen = () => {
               >
                 <View style={styles.markerContainer}>
                   <Icon name="directions-car" size={24} color={colors.primary} />
+                </View>
+              </Marker>
+            )}
+
+            {/* Route start marker */}
+            {historicalRoute.length > 0 && showRouteView && (
+              <Marker
+                coordinate={historicalRoute[0]}
+                title="Route Start"
+                description="Starting point"
+              >
+                <View style={[styles.markerContainer, { backgroundColor: colors.success }]}>
+                  <Icon name="flag" size={20} color="#ffffff" />
+                </View>
+              </Marker>
+            )}
+
+            {/* Route end marker */}
+            {historicalRoute.length > 1 && showRouteView && (
+              <Marker
+                coordinate={historicalRoute[historicalRoute.length - 1]}
+                title="Route End"
+                description="Ending point"
+              >
+                <View style={[styles.markerContainer, { backgroundColor: colors.danger }]}>
+                  <Icon name="flag" size={20} color="#ffffff" />
                 </View>
               </Marker>
             )}
@@ -375,6 +488,88 @@ const TrackingScreen = () => {
               <Text style={styles.miniStatValue}>{formatTime(elapsedTime)}</Text>
               <Text style={styles.miniStatLabel}>Time</Text>
             </View>
+          </View>
+        </View>
+      )}
+
+      {/* Route Selection UI */}
+      {showRouteView && (
+        <View style={styles.routeSelectionContainer}>
+          <Text style={styles.routeSelectionTitle}>Select Route to View</Text>
+
+          <View style={styles.selectionRow}>
+            <View style={styles.pickerContainer}>
+              <Text style={styles.pickerLabel}>Vehicle</Text>
+              <View style={styles.pickerWrapper}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.vehicleScroll}>
+                  {allVehicles.map((vehicle) => (
+                    <TouchableOpacity
+                      key={vehicle.id}
+                      style={[
+                        styles.vehicleChip,
+                        selectedVehicle === vehicle.id.toString() && styles.vehicleChipSelected
+                      ]}
+                      onPress={() => setSelectedVehicle(vehicle.id.toString())}
+                    >
+                      <Text style={[
+                        styles.vehicleChipText,
+                        selectedVehicle === vehicle.id.toString() && styles.vehicleChipTextSelected
+                      ]}>
+                        {vehicle.license_plate}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.selectionRow}>
+            <View style={styles.dateContainer}>
+              <Text style={styles.pickerLabel}>Date</Text>
+              <TouchableOpacity
+                style={styles.dateButton}
+                onPress={() => {
+                  // For React Native, we'd use a proper date picker
+                  // For now, let's set yesterday as default
+                  const yesterday = new Date();
+                  yesterday.setDate(yesterday.getDate() - 1);
+                  setSelectedDate(yesterday.toISOString().split('T')[0]);
+                }}
+              >
+                <Text style={styles.dateButtonText}>
+                  {selectedDate || 'Select Date'}
+                </Text>
+                <Icon name="calendar-today" size={20} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.routeActionButtons}>
+            <TouchableOpacity
+              style={[styles.routeButton, styles.showRouteButton]}
+              onPress={fetchHistoricalRoute}
+              disabled={loading || !selectedVehicle || !selectedDate}
+            >
+              {loading ? (
+                <ActivityIndicator color="#ffffff" size="small" />
+              ) : (
+                <>
+                  <Icon name="timeline" size={20} color="#ffffff" />
+                  <Text style={styles.routeButtonText}>Show Route</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {historicalRoute.length > 0 && (
+              <TouchableOpacity
+                style={[styles.routeButton, styles.clearRouteButton]}
+                onPress={clearHistoricalRoute}
+              >
+                <Icon name="clear" size={20} color="#ffffff" />
+                <Text style={styles.routeButtonText}>Clear Route</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       )}
@@ -639,6 +834,115 @@ const styles = StyleSheet.create({
     elevation: 4,
     borderWidth: 2,
     borderColor: colors.primary,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+  },
+  routeSelectionContainer: {
+    backgroundColor: colors.surface,
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  routeSelectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  selectionRow: {
+    marginBottom: 15,
+  },
+  pickerContainer: {
+    marginBottom: 10,
+  },
+  pickerLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  pickerWrapper: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  vehicleScroll: {
+    flexDirection: 'row',
+  },
+  vehicleChip: {
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  vehicleChipSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  vehicleChipText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  vehicleChipTextSelected: {
+    color: '#ffffff',
+  },
+  dateContainer: {
+    marginBottom: 10,
+  },
+  dateButton: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dateButtonText: {
+    fontSize: 16,
+    color: colors.text,
+    flex: 1,
+  },
+  routeActionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  routeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    flex: 1,
+    marginHorizontal: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  showRouteButton: {
+    backgroundColor: colors.primary,
+  },
+  clearRouteButton: {
+    backgroundColor: colors.secondary,
+  },
+  routeButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
 });
 
