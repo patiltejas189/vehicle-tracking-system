@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import axios from 'axios';
 import io from 'socket.io-client';
 import L from 'leaflet';
+import 'leaflet-routing-machine';
 import { FaSpinner } from 'react-icons/fa';
 import API_BASE from '../api';
 
@@ -147,11 +148,42 @@ const Map = () => {
 
     try {
       const response = await axios.get(`${API_BASE}/api/tracking/route/${selectedVehicle}?date=${selectedDate}`);
-      const routePoints = response.data.map(point => [point.latitude, point.longitude]);
-      setRoute(routePoints);
+      const gpsPoints = response.data;
+
+      if (gpsPoints.length < 2) {
+        setRoute([]);
+        setShowRoute(true);
+        return;
+      }
+
+      // Create waypoints string for OSRM: lon,lat;lon,lat;...
+      const waypoints = gpsPoints.map(point => `${point.longitude},${point.latitude}`).join(';');
+
+      // Call OSRM to get the route along roads
+      const osrmResponse = await axios.get(`https://router.project-osrm.org/route/v1/driving/${waypoints}?overview=full&geometries=geojson`);
+
+      if (osrmResponse.data.routes && osrmResponse.data.routes.length > 0) {
+        // Extract coordinates from OSRM response and convert to [lat, lng]
+        const routeGeometry = osrmResponse.data.routes[0].geometry.coordinates.map(coord => [coord[1], coord[0]]);
+        setRoute(routeGeometry);
+      } else {
+        // Fallback to straight lines if OSRM fails
+        const routePoints = gpsPoints.map(point => [point.latitude, point.longitude]);
+        setRoute(routePoints);
+      }
+
       setShowRoute(true);
     } catch (error) {
       console.error('Error fetching route:', error);
+      // Fallback to straight lines
+      try {
+        const response = await axios.get(`${API_BASE}/api/tracking/route/${selectedVehicle}?date=${selectedDate}`);
+        const routePoints = response.data.map(point => [point.latitude, point.longitude]);
+        setRoute(routePoints);
+        setShowRoute(true);
+      } catch (fallbackError) {
+        console.error('Fallback route fetch failed:', fallbackError);
+      }
     }
   };
 
