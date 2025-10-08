@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
-
-const API_BASE = (import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`).replace(/\/$/, '');
+import API_BASE from '../api';
 
 const AuthContext = createContext();
 
@@ -32,7 +31,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await axios.get(`${API_BASE}/api/auth/profile`);
       setUser(response.data.user);
-    } catch (error) {
+    } catch {
       localStorage.removeItem('token');
       delete axios.defaults.headers.common['Authorization'];
     } finally {

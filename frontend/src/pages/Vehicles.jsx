@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import API_BASE from '../api';
 import { FaPlus, FaSearch, FaFilter, FaDownload, FaEye, FaEdit, FaTrash, FaTimes, FaCar, FaUser, FaSpinner, FaSort, FaSortUp, FaSortDown } from 'react-icons/fa';
 
 const Vehicles = () => {
@@ -74,7 +75,7 @@ const Vehicles = () => {
 
   const fetchVehicles = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/vehicles');
+      const response = await axios.get(`${API_BASE}/api/vehicles`);
       setVehicles(response.data);
     } catch (error) {
       console.error('Error fetching vehicles:', error);
@@ -87,9 +88,9 @@ const Vehicles = () => {
     e.preventDefault();
     try {
       if (editingVehicle) {
-        await axios.put(`http://localhost:5000/api/vehicles/${editingVehicle.id}`, formData);
+        await axios.put(`${API_BASE}/api/vehicles/${editingVehicle.id}`, formData);
       } else {
-        await axios.post('http://localhost:5000/api/vehicles', formData);
+        await axios.post(`${API_BASE}/api/vehicles`, formData);
       }
       setFormData({
         vehicle_id: '',
@@ -125,7 +126,7 @@ const Vehicles = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this vehicle?')) {
       try {
-        await axios.delete(`http://localhost:5000/api/vehicles/${id}`);
+        await axios.delete(`${API_BASE}/api/vehicles/${id}`);
         fetchVehicles();
       } catch (error) {
         console.error('Error deleting vehicle:', error);
