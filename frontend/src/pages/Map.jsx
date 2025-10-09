@@ -7,6 +7,9 @@ import L from 'leaflet';
 import { FaSpinner } from 'react-icons/fa';
 import API_BASE from '../api';
 
+// Create a separate axios instance for external APIs without auth headers
+const externalAxios = axios.create();
+
 // Fix for default markers in react-leaflet
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -158,8 +161,8 @@ const Map = () => {
       // Create waypoints string for OSRM: lon,lat;lon,lat;...
       const waypoints = gpsPoints.map(point => `${point.longitude},${point.latitude}`).join(';');
 
-      // Call OSRM to get the route along roads
-      const osrmResponse = await axios.get(`https://router.project-osrm.org/route/v1/driving/${waypoints}?overview=full&geometries=geojson`);
+      // Call OSRM to get the route along roads (using external axios without auth headers)
+      const osrmResponse = await externalAxios.get(`https://router.project-osrm.org/route/v1/driving/${waypoints}?overview=full&geometries=geojson`);
 
       if (osrmResponse.data.routes && osrmResponse.data.routes.length > 0) {
         // Extract coordinates from OSRM response and convert to [lat, lng]

@@ -71,6 +71,13 @@ const GPSTracker = ({ assignedVehicle }) => {
       return;
     }
 
+    // Check if position.coords exists
+    if (!position || !position.coords) {
+      console.error('Invalid position data received');
+      setError('Invalid GPS data received');
+      return;
+    }
+
     const gpsData = {
       vehicle_id: assignedVehicle.id,
       latitude: position.coords.latitude,
@@ -85,7 +92,7 @@ const GPSTracker = ({ assignedVehicle }) => {
 
     try {
       await axios.post(`${API_BASE}/api/tracking/gps`, gpsData);
-      console.log('GPS data sent successfully (accuracy: ' + position.coords.accuracy + 'm)');
+      console.log('GPS data sent successfully (accuracy: ' + (position.coords.accuracy || 'unknown') + 'm)');
     } catch (error) {
       console.error('Error sending GPS data:', error);
       setError('Failed to send GPS data - check connection');
@@ -109,11 +116,18 @@ const GPSTracker = ({ assignedVehicle }) => {
     // Start watching position (same as startTracking but without resetting state)
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
+        // Check if position.coords exists
+        if (!position || !position.coords) {
+          console.error('Invalid position data received in resumeTracking');
+          setError('Invalid GPS data received');
+          return;
+        }
+
         // Validate GPS accuracy
-        const accuracy = position.coords.accuracy;
+        const accuracy = position.coords.accuracy || 0;
         const isAccurate = accuracy <= 100; // Within 100 meters
 
-        if (!isAccurate) {
+        if (!isAccurate && accuracy > 0) {
           console.warn(`GPS accuracy low: ${accuracy}m`);
           setError(`GPS accuracy: ${accuracy.toFixed(0)}m (may be inaccurate)`);
         } else {
@@ -248,11 +262,18 @@ const GPSTracker = ({ assignedVehicle }) => {
     // Start watching position with optimized accuracy settings
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
+        // Check if position.coords exists
+        if (!position || !position.coords) {
+          console.error('Invalid position data received in startTracking');
+          setError('Invalid GPS data received');
+          return;
+        }
+
         // Validate GPS accuracy
-        const accuracy = position.coords.accuracy;
+        const accuracy = position.coords.accuracy || 0;
         const isAccurate = accuracy <= 100; // Within 100 meters
 
-        if (!isAccurate) {
+        if (!isAccurate && accuracy > 0) {
           console.warn(`GPS accuracy low: ${accuracy}m`);
           setError(`GPS accuracy: ${accuracy.toFixed(0)}m (may be inaccurate)`);
         } else {
