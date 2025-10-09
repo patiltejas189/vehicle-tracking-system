@@ -12,7 +12,9 @@ const GPSTracker = ({ assignedVehicle }) => {
   const [lastPosition, setLastPosition] = useState(null);
   const [error, setError] = useState('');
   const [tripStartTime, setTripStartTime] = useState(null);
-  
+  const [accuracyWarningShown, setAccuracyWarningShown] = useState(false);
+  const [timeoutCount, setTimeoutCount] = useState(0);
+
   const watchIdRef = useRef(null);
   const intervalRef = useRef(null);
   const tripTimerRef = useRef(null);
@@ -92,7 +94,10 @@ const GPSTracker = ({ assignedVehicle }) => {
 
     try {
       await axios.post(`${API_BASE}/api/tracking/gps`, gpsData);
-      console.log('GPS data sent successfully (accuracy: ' + (position.coords.accuracy || 'unknown') + 'm)');
+      // Only log successful sends every 10th time to reduce console noise
+      if (Math.random() < 0.1) {
+        console.log('GPS data sent successfully (accuracy: ' + (position.coords.accuracy || 'unknown') + 'm)');
+      }
     } catch (error) {
       console.error('Error sending GPS data:', error);
       setError('Failed to send GPS data - check connection');
@@ -128,9 +133,15 @@ const GPSTracker = ({ assignedVehicle }) => {
         const isAccurate = accuracy <= 100; // Within 100 meters
 
         if (!isAccurate && accuracy > 0) {
-          console.warn(`GPS accuracy low: ${accuracy}m`);
+          if (!accuracyWarningShown) {
+            console.warn(`GPS accuracy low: ${accuracy}m`);
+            setAccuracyWarningShown(true);
+          }
           setError(`GPS accuracy: ${accuracy.toFixed(0)}m (may be inaccurate)`);
         } else {
+          if (accuracyWarningShown) {
+            setAccuracyWarningShown(false);
+          }
           setError(''); // Clear accuracy warning
         }
 
@@ -189,12 +200,19 @@ const GPSTracker = ({ assignedVehicle }) => {
             errorMessage = 'GPS signal unavailable. Check your location settings.';
             break;
           case error.TIMEOUT:
-            errorMessage = 'GPS timeout. Retrying...';
+            setTimeoutCount(prev => prev + 1);
+            // Only show timeout message every 3 timeouts to reduce noise
+            if (timeoutCount % 3 === 0) {
+              errorMessage = 'GPS signal weak. Retrying...';
+            }
             // Auto-retry after timeout
             setTimeout(() => {
               if (isTracking) {
                 navigator.geolocation.getCurrentPosition(
-                  (position) => sendGPSData(position),
+                  (position) => {
+                    sendGPSData(position);
+                    setTimeoutCount(0); // Reset counter on success
+                  },
                   () => console.error('Retry GPS failed'),
                   { enableHighAccuracy: true, timeout: 15000 }
                 );
@@ -274,9 +292,15 @@ const GPSTracker = ({ assignedVehicle }) => {
         const isAccurate = accuracy <= 100; // Within 100 meters
 
         if (!isAccurate && accuracy > 0) {
-          console.warn(`GPS accuracy low: ${accuracy}m`);
+          if (!accuracyWarningShown) {
+            console.warn(`GPS accuracy low: ${accuracy}m`);
+            setAccuracyWarningShown(true);
+          }
           setError(`GPS accuracy: ${accuracy.toFixed(0)}m (may be inaccurate)`);
         } else {
+          if (accuracyWarningShown) {
+            setAccuracyWarningShown(false);
+          }
           setError(''); // Clear accuracy warning
         }
 
@@ -335,12 +359,19 @@ const GPSTracker = ({ assignedVehicle }) => {
             errorMessage = 'GPS signal unavailable. Check your location settings.';
             break;
           case error.TIMEOUT:
-            errorMessage = 'GPS timeout. Retrying...';
+            setTimeoutCount(prev => prev + 1);
+            // Only show timeout message every 3 timeouts to reduce noise
+            if (timeoutCount % 3 === 0) {
+              errorMessage = 'GPS signal weak. Retrying...';
+            }
             // Auto-retry after timeout
             setTimeout(() => {
               if (isTracking) {
                 navigator.geolocation.getCurrentPosition(
-                  (position) => sendGPSData(position),
+                  (position) => {
+                    sendGPSData(position);
+                    setTimeoutCount(0); // Reset counter on success
+                  },
                   () => console.error('Retry GPS failed'),
                   { enableHighAccuracy: true, timeout: 15000 }
                 );
