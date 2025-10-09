@@ -115,7 +115,7 @@ router.post('/gps', authenticateToken, authorizeRoles('driver'), async (req, res
 // Get latest position for all vehicles
 router.get('/latest', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query(`
+    let query = `
       SELECT DISTINCT ON (g.vehicle_id)
         g.vehicle_id,
         g.latitude,
@@ -128,9 +128,21 @@ router.get('/latest', authenticateToken, async (req, res) => {
         v.status
       FROM gps_data g
       JOIN vehicles v ON g.vehicle_id = v.id
-      ORDER BY g.vehicle_id, g.timestamp DESC
-    `);
+    `;
+    let params = [];
 
+    if (req.user.role === 'driver') {
+      query += ' WHERE v.assigned_driver_id = $1';
+      params.push(req.user.id);
+    } else if (req.user.role === 'customer') {
+      // For now, customers see no vehicles; could be extended
+      return res.json([]);
+    }
+    // admin and fleet_manager see all
+
+    query += ' ORDER BY g.vehicle_id, g.timestamp DESC';
+
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (error) {
     console.error('Get latest positions error:', error);
