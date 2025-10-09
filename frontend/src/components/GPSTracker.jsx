@@ -503,11 +503,11 @@ const GPSTracker = ({ assignedVehicle }) => {
             <FaMapMarkerAlt className="text-info-600 text-xl mx-auto mb-2" />
             <div className="text-xs text-secondary-600 mb-1">GPS Accuracy</div>
             <div className={`text-sm font-semibold ${
-              currentLocation.accuracy <= 50 ? 'text-success-600' :
-              currentLocation.accuracy <= 100 ? 'text-warning-600' :
-              'text-danger-600'
+              currentLocation && currentLocation.accuracy <= 50 ? 'text-success-600' :
+              currentLocation && currentLocation.accuracy <= 100 ? 'text-warning-600' :
+              currentLocation ? 'text-danger-600' : 'text-secondary-600'
             }`}>
-              {currentLocation.accuracy ? `${currentLocation.accuracy.toFixed(0)}m` : 'N/A'}
+              {currentLocation && currentLocation.accuracy ? `${currentLocation.accuracy.toFixed(0)}m` : 'Getting accuracy...'}
             </div>
           </div>
 

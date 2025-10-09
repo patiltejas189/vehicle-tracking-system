@@ -13,6 +13,7 @@ import {
   Tooltip,
   Legend,
   ArcElement,
+  Filler,
 } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import { FaCar, FaCheckCircle, FaExclamationTriangle, FaWrench, FaEye, FaMap, FaFileAlt, FaUsers, FaSpinner } from 'react-icons/fa';
@@ -28,7 +29,8 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  ArcElement
+  ArcElement,
+  Filler
 );
 
 const Dashboard = () => {
