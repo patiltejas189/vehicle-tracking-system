@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Bar, Line, Pie, Doughnut, Radar } from 'react-chartjs-2';
-import { FaSpinner, FaTachometerAlt, FaUsers, FaCar, FaExclamationTriangle, FaChartLine, FaStar, FaClock, FaRoute } from 'react-icons/fa';
+import { Bar, Line, Doughnut } from 'react-chartjs-2';
+import { FaSpinner, FaTachometerAlt, FaCar, FaExclamationTriangle, FaStar, FaRoute } from 'react-icons/fa';
 
 const API_BASE = (import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:5000`).replace(/\/$/, '');
 import {
@@ -12,7 +12,6 @@ import {
   LineElement,
   PointElement,
   ArcElement,
-  RadialLinearScale,
   Title,
   Tooltip,
   Legend,
@@ -25,7 +24,6 @@ ChartJS.register(
   LineElement,
   PointElement,
   ArcElement,
-  RadialLinearScale,
   Title,
   Tooltip,
   Legend
@@ -33,11 +31,8 @@ ChartJS.register(
 
 const Analytics = () => {
   const [dashboardData, setDashboardData] = useState(null);
-  const [driverPerformance, setDriverPerformance] = useState([]);
-  const [vehicleUtilization, setVehicleUtilization] = useState([]);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState('24h');
-  const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     fetchAnalyticsData();
@@ -46,15 +41,8 @@ const Analytics = () => {
   const fetchAnalyticsData = async () => {
     try {
       setLoading(true);
-      const [dashboardRes, driversRes, vehiclesRes] = await Promise.all([
-        axios.get(`${API_BASE}/api/analytics/dashboard?timeRange=${timeRange}`),
-        axios.get(`${API_BASE}/api/analytics/drivers?timeRange=${timeRange}`),
-        axios.get(`${API_BASE}/api/analytics/vehicles?timeRange=${timeRange}`)
-      ]);
-
+      const dashboardRes = await axios.get(`${API_BASE}/api/analytics/dashboard?timeRange=${timeRange}`);
       setDashboardData(dashboardRes.data);
-      setDriverPerformance(driversRes.data);
-      setVehicleUtilization(vehiclesRes.data);
     } catch (error) {
       console.error('Error fetching analytics data:', error);
     } finally {
