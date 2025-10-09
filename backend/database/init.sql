@@ -33,10 +33,18 @@ CREATE TABLE IF NOT EXISTS gps_data (
   longitude DECIMAL(11, 8) NOT NULL,
   speed DECIMAL(5, 2),
   heading DECIMAL(5, 2),
+  accuracy DECIMAL(6, 2), -- GPS accuracy in meters
+  altitude DECIMAL(7, 2), -- Altitude in meters
+  altitude_accuracy DECIMAL(6, 2), -- Altitude accuracy in meters
   timestamp TIMESTAMP NOT NULL,
   is_offline BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Add accuracy columns if they don't exist (for existing databases)
+ALTER TABLE gps_data ADD COLUMN IF NOT EXISTS accuracy DECIMAL(6, 2);
+ALTER TABLE gps_data ADD COLUMN IF NOT EXISTS altitude DECIMAL(7, 2);
+ALTER TABLE gps_data ADD COLUMN IF NOT EXISTS altitude_accuracy DECIMAL(6, 2);
 
 -- Routes table
 CREATE TABLE IF NOT EXISTS routes (

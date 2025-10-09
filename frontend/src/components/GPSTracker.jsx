@@ -77,15 +77,29 @@ const GPSTracker = ({ assignedVehicle }) => {
       longitude: position.coords.longitude,
       speed: position.coords.speed ? position.coords.speed * 3.6 : 0, // Convert m/s to km/h
       heading: position.coords.heading || 0,
+      accuracy: position.coords.accuracy || 0, // GPS accuracy in meters
+      altitude: position.coords.altitude || null,
+      altitudeAccuracy: position.coords.altitudeAccuracy || null,
       timestamp: new Date().toISOString()
     };
 
     try {
       await axios.post(`${API_BASE}/api/tracking/gps`, gpsData);
-      console.log('GPS data sent successfully');
+      console.log('GPS data sent successfully (accuracy: ' + position.coords.accuracy + 'm)');
     } catch (error) {
       console.error('Error sending GPS data:', error);
-      setError('Failed to send GPS data');
+      setError('Failed to send GPS data - check connection');
+
+      // Retry logic for failed sends
+      setTimeout(async () => {
+        try {
+          await axios.post(`${API_BASE}/api/tracking/gps`, gpsData);
+          console.log('GPS data retry successful');
+          setError(''); // Clear error on successful retry
+        } catch (retryError) {
+          console.error('GPS data retry failed:', retryError);
+        }
+      }, 5000); // Retry after 5 seconds
     }
   };
 
@@ -95,34 +109,55 @@ const GPSTracker = ({ assignedVehicle }) => {
     // Start watching position (same as startTracking but without resetting state)
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
+        // Validate GPS accuracy
+        const accuracy = position.coords.accuracy;
+        const isAccurate = accuracy <= 100; // Within 100 meters
+
+        if (!isAccurate) {
+          console.warn(`GPS accuracy low: ${accuracy}m`);
+          setError(`GPS accuracy: ${accuracy.toFixed(0)}m (may be inaccurate)`);
+        } else {
+          setError(''); // Clear accuracy warning
+        }
+
         const newLocation = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
           speed: position.coords.speed ? position.coords.speed * 3.6 : 0,
           heading: position.coords.heading || 0,
+          accuracy: accuracy,
           timestamp: new Date()
         };
 
         setCurrentLocation(newLocation);
         setCurrentSpeed(newLocation.speed);
 
-        // Calculate distance if we have a previous position
-        if (lastPosition) {
+        // Calculate distance if we have a previous position and accuracy is good
+        if (lastPosition && isAccurate) {
           const distance = calculateDistance(
             lastPosition.latitude,
             lastPosition.longitude,
             newLocation.latitude,
             newLocation.longitude
           );
-          setTripDistance(prev => {
-            const newDistance = prev + distance;
-            // Update localStorage with new distance
-            const updatedTrip = JSON.parse(localStorage.getItem('activeTrip') || '{}');
-            updatedTrip.distance = newDistance;
-            updatedTrip.lastPosition = newLocation;
-            localStorage.setItem('activeTrip', JSON.stringify(updatedTrip));
-            return newDistance;
-          });
+
+          // Filter out unrealistic jumps (more than 500m in 5 seconds)
+          const timeDiff = (newLocation.timestamp - lastPosition.timestamp) / 1000;
+          const speedCheck = distance / (timeDiff / 3600); // km/h
+
+          if (speedCheck <= 500) { // Reasonable speed limit for distance calculation
+            setTripDistance(prev => {
+              const newDistance = prev + distance;
+              // Update localStorage with new distance
+              const updatedTrip = JSON.parse(localStorage.getItem('activeTrip') || '{}');
+              updatedTrip.distance = newDistance;
+              updatedTrip.lastPosition = newLocation;
+              localStorage.setItem('activeTrip', JSON.stringify(updatedTrip));
+              return newDistance;
+            });
+          } else {
+            console.warn(`Unrealistic speed detected: ${speedCheck.toFixed(1)} km/h, skipping distance calculation`);
+          }
         }
 
         setLastPosition(newLocation);
@@ -130,12 +165,38 @@ const GPSTracker = ({ assignedVehicle }) => {
       },
       (error) => {
         console.error('GPS Error:', error);
-        setError(`GPS Error: ${error.message}`);
+        let errorMessage = 'GPS tracking failed';
+
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = 'Location access denied. Please enable GPS permissions.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = 'GPS signal unavailable. Check your location settings.';
+            break;
+          case error.TIMEOUT:
+            errorMessage = 'GPS timeout. Retrying...';
+            // Auto-retry after timeout
+            setTimeout(() => {
+              if (isTracking) {
+                navigator.geolocation.getCurrentPosition(
+                  (position) => sendGPSData(position),
+                  () => console.error('Retry GPS failed'),
+                  { enableHighAccuracy: true, timeout: 15000 }
+                );
+              }
+            }, 2000);
+            break;
+          default:
+            errorMessage = `GPS Error: ${error.message}`;
+        }
+
+        setError(errorMessage);
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 5000
+        timeout: 15000, // Increased timeout for better accuracy
+        maximumAge: 3000 // Reduced max age for fresher data
       }
     );
 
@@ -184,37 +245,58 @@ const GPSTracker = ({ assignedVehicle }) => {
     };
     localStorage.setItem('activeTrip', JSON.stringify(tripData));
 
-    // Start watching position
+    // Start watching position with optimized accuracy settings
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
+        // Validate GPS accuracy
+        const accuracy = position.coords.accuracy;
+        const isAccurate = accuracy <= 100; // Within 100 meters
+
+        if (!isAccurate) {
+          console.warn(`GPS accuracy low: ${accuracy}m`);
+          setError(`GPS accuracy: ${accuracy.toFixed(0)}m (may be inaccurate)`);
+        } else {
+          setError(''); // Clear accuracy warning
+        }
+
         const newLocation = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
           speed: position.coords.speed ? position.coords.speed * 3.6 : 0,
           heading: position.coords.heading || 0,
+          accuracy: accuracy,
           timestamp: new Date()
         };
 
         setCurrentLocation(newLocation);
         setCurrentSpeed(newLocation.speed);
 
-        // Calculate distance if we have a previous position
-        if (lastPosition) {
+        // Calculate distance if we have a previous position and accuracy is good
+        if (lastPosition && isAccurate) {
           const distance = calculateDistance(
             lastPosition.latitude,
             lastPosition.longitude,
             newLocation.latitude,
             newLocation.longitude
           );
-          setTripDistance(prev => {
-            const newDistance = prev + distance;
-            // Update localStorage with new distance
-            const updatedTrip = JSON.parse(localStorage.getItem('activeTrip') || '{}');
-            updatedTrip.distance = newDistance;
-            updatedTrip.lastPosition = newLocation;
-            localStorage.setItem('activeTrip', JSON.stringify(updatedTrip));
-            return newDistance;
-          });
+
+          // Filter out unrealistic jumps (more than 500m in 5 seconds)
+          const timeDiff = (newLocation.timestamp - lastPosition.timestamp) / 1000;
+          const speedCheck = distance / (timeDiff / 3600); // km/h
+
+          if (speedCheck <= 500) { // Reasonable speed limit for distance calculation
+            setTripDistance(prev => {
+              const newDistance = prev + distance;
+              // Update localStorage with new distance
+              const updatedTrip = JSON.parse(localStorage.getItem('activeTrip') || '{}');
+              updatedTrip.distance = newDistance;
+              updatedTrip.lastPosition = newLocation;
+              localStorage.setItem('activeTrip', JSON.stringify(updatedTrip));
+              return newDistance;
+            });
+          } else {
+            console.warn(`Unrealistic speed detected: ${speedCheck.toFixed(1)} km/h, skipping distance calculation`);
+          }
         }
 
         setLastPosition(newLocation);
@@ -222,12 +304,38 @@ const GPSTracker = ({ assignedVehicle }) => {
       },
       (error) => {
         console.error('GPS Error:', error);
-        setError(`GPS Error: ${error.message}`);
+        let errorMessage = 'GPS tracking failed';
+
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = 'Location access denied. Please enable GPS permissions.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = 'GPS signal unavailable. Check your location settings.';
+            break;
+          case error.TIMEOUT:
+            errorMessage = 'GPS timeout. Retrying...';
+            // Auto-retry after timeout
+            setTimeout(() => {
+              if (isTracking) {
+                navigator.geolocation.getCurrentPosition(
+                  (position) => sendGPSData(position),
+                  () => console.error('Retry GPS failed'),
+                  { enableHighAccuracy: true, timeout: 15000 }
+                );
+              }
+            }, 2000);
+            break;
+          default:
+            errorMessage = `GPS Error: ${error.message}`;
+        }
+
+        setError(errorMessage);
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 5000
+        timeout: 15000, // Increased timeout for better accuracy
+        maximumAge: 3000 // Reduced max age for fresher data
       }
     );
 
@@ -350,7 +458,7 @@ const GPSTracker = ({ assignedVehicle }) => {
 
       {/* Trip Information */}
       {isTracking && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
           <div className="bg-primary-50 rounded-xl p-4 text-center">
             <FaMapMarkerAlt className="text-primary-600 text-xl mx-auto mb-2" />
             <div className="text-xs text-secondary-600 mb-1">Current Location</div>
@@ -367,6 +475,18 @@ const GPSTracker = ({ assignedVehicle }) => {
             <div className="text-xs text-secondary-600 mb-1">Current Speed</div>
             <div className="text-sm font-semibold text-secondary-900">
               {currentSpeed.toFixed(1)} km/h
+            </div>
+          </div>
+
+          <div className="bg-info-50 rounded-xl p-4 text-center">
+            <FaMapMarkerAlt className="text-info-600 text-xl mx-auto mb-2" />
+            <div className="text-xs text-secondary-600 mb-1">GPS Accuracy</div>
+            <div className={`text-sm font-semibold ${
+              currentLocation.accuracy <= 50 ? 'text-success-600' :
+              currentLocation.accuracy <= 100 ? 'text-warning-600' :
+              'text-danger-600'
+            }`}>
+              {currentLocation.accuracy ? `${currentLocation.accuracy.toFixed(0)}m` : 'N/A'}
             </div>
           </div>
 

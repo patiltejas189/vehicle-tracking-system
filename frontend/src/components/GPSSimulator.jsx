@@ -80,20 +80,26 @@ const GPSSimulator = ({ vehicleId, onLocationUpdate }) => {
   const sendSimulatedGPS = async (location) => {
     try {
       const token = localStorage.getItem('token');
+      // Simulate realistic GPS accuracy (10-100 meters)
+      const simulatedAccuracy = Math.random() * 90 + 10;
+
       await axios.post(`${API_BASE}/api/tracking/gps`, {
         vehicle_id: vehicleId,
         latitude: location.latitude,
         longitude: location.longitude,
         speed: location.speed,
         heading: location.heading,
+        accuracy: simulatedAccuracy,
+        altitude: Math.random() * 500 + 100, // 100-600m altitude
+        altitude_accuracy: simulatedAccuracy * 2,
         timestamp: new Date().toISOString()
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
-      console.log('Simulated GPS data sent:', location);
+
+      console.log('Simulated GPS data sent:', { ...location, accuracy: simulatedAccuracy });
       if (onLocationUpdate) {
-        onLocationUpdate(location);
+        onLocationUpdate({ ...location, accuracy: simulatedAccuracy });
       }
     } catch (error) {
       console.error('Error sending simulated GPS:', error);

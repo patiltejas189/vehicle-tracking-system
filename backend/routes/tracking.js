@@ -56,24 +56,36 @@ router.get('/vehicle/:vehicleId', authenticateToken, async (req, res) => {
 // Add GPS data (for vehicle devices/drivers)
 router.post('/gps', authenticateToken, authorizeRoles('driver'), async (req, res) => {
   try {
-    const { vehicle_id, latitude, longitude, speed, heading, timestamp } = req.body;
+    const { vehicle_id, latitude, longitude, speed, heading, accuracy, altitude, altitude_accuracy, timestamp } = req.body;
 
     // Validate required fields
     if (!vehicle_id || latitude === undefined || longitude === undefined) {
       return res.status(400).json({ message: 'Vehicle ID, latitude, and longitude are required' });
     }
 
-    // Anti-spoofing validation
+    // Enhanced coordinate validation
     if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
       return res.status(400).json({ message: 'Invalid GPS coordinates' });
     }
 
-    if (speed !== undefined && (speed < 0 || speed > 200)) { // Max speed 200 km/h
-      return res.status(400).json({ message: 'Invalid speed value' });
+    // Speed validation with more realistic limits
+    if (speed !== undefined && (speed < 0 || speed > 300)) { // Max speed 300 km/h (highway speeds)
+      return res.status(400).json({ message: 'Invalid speed value (must be 0-300 km/h)' });
     }
 
+    // Heading validation
     if (heading !== undefined && (heading < 0 || heading > 360)) {
-      return res.status(400).json({ message: 'Invalid heading value' });
+      return res.status(400).json({ message: 'Invalid heading value (must be 0-360 degrees)' });
+    }
+
+    // Accuracy validation
+    if (accuracy !== undefined && (accuracy < 0 || accuracy > 10000)) { // Max 10km accuracy
+      return res.status(400).json({ message: 'Invalid accuracy value' });
+    }
+
+    // Altitude validation
+    if (altitude !== undefined && (altitude < -500 || altitude > 10000)) { // -500m to 10km
+      return res.status(400).json({ message: 'Invalid altitude value' });
     }
 
     // Check if vehicle exists and user is assigned to it
@@ -86,15 +98,39 @@ router.post('/gps', authenticateToken, authorizeRoles('driver'), async (req, res
       return res.status(403).json({ message: 'Not authorized for this vehicle' });
     }
 
+    // GPS data quality validation
+    let quality_score = 'good';
+    if (accuracy > 100) quality_score = 'fair';
+    if (accuracy > 500) quality_score = 'poor';
+
     const gpsTimestamp = timestamp ? new Date(timestamp) : new Date();
 
-    const result = await pool.query(
-      `INSERT INTO gps_data (vehicle_id, latitude, longitude, speed, heading, timestamp)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [vehicle_id, latitude, longitude, speed, heading, gpsTimestamp]
+    // Check for unrealistic position jumps (anti-spoofing)
+    const lastPosition = await pool.query(
+      'SELECT latitude, longitude, timestamp FROM gps_data WHERE vehicle_id = $1 ORDER BY timestamp DESC LIMIT 1',
+      [vehicle_id]
     );
 
-    // Emit real-time update via Socket.IO
+    if (lastPosition.rows.length > 0) {
+      const lastPos = lastPosition.rows[0];
+      const timeDiff = (gpsTimestamp - new Date(lastPos.timestamp)) / 1000; // seconds
+      const distance = calculateDistance(latitude, longitude, lastPos.latitude, lastPos.longitude);
+      const speedCheck = distance / (timeDiff / 3600); // km/h
+
+      // Flag suspicious jumps (over 200 km/h instantaneous speed)
+      if (speedCheck > 200 && timeDiff < 300) { // Within 5 minutes
+        console.warn(`Suspicious GPS jump detected for vehicle ${vehicle_id}: ${speedCheck.toFixed(1)} km/h over ${timeDiff}s`);
+        // Still allow the data but log it
+      }
+    }
+
+    const result = await pool.query(
+      `INSERT INTO gps_data (vehicle_id, latitude, longitude, speed, heading, accuracy, altitude, altitude_accuracy, timestamp)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [vehicle_id, latitude, longitude, speed, heading, accuracy, altitude, altitude_accuracy, gpsTimestamp]
+    );
+
+    // Emit real-time update via Socket.IO with quality info
     const io = req.app.get('io');
     io.emit('gps_update', {
       vehicle_id,
@@ -102,15 +138,33 @@ router.post('/gps', authenticateToken, authorizeRoles('driver'), async (req, res
       longitude,
       speed,
       heading,
+      accuracy,
+      quality_score,
       timestamp: gpsTimestamp
     });
 
-    res.status(201).json(result.rows[0]);
+    res.status(201).json({
+      ...result.rows[0],
+      quality_score
+    });
   } catch (error) {
     console.error('Add GPS data error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+// Helper function for distance calculation
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon1 - lon2) * Math.PI / 180;
+  const a =
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c; // Distance in kilometers
+}
 
 // Get latest position for all vehicles
 router.get('/latest', authenticateToken, async (req, res) => {
@@ -122,6 +176,8 @@ router.get('/latest', authenticateToken, async (req, res) => {
         g.longitude,
         g.speed,
         g.heading,
+        g.accuracy,
+        g.altitude,
         g.timestamp,
         v.vehicle_id as vehicle_code,
         v.license_plate,

@@ -278,6 +278,7 @@ const Map = () => {
                 </div>
                 <div className="text-xs text-secondary-600 space-y-1">
                   <div>Speed: {vehicle.speed ? `${vehicle.speed} km/h` : 'N/A'}</div>
+                  <div>Accuracy: {vehicle.accuracy ? `${vehicle.accuracy}m` : 'N/A'}</div>
                   <div>Driver: {vehicle.driver_name || 'Unassigned'}</div>
                   <div>Last Update: {new Date(vehicle.timestamp).toLocaleTimeString()}</div>
                 </div>
@@ -455,6 +456,16 @@ const Map = () => {
                     <div className="flex justify-between items-center py-1">
                       <span className="font-medium text-secondary-600">Speed:</span>
                       <span className="text-secondary-900">{vehicle.speed ? `${vehicle.speed} km/h` : 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-1">
+                      <span className="font-medium text-secondary-600">Accuracy:</span>
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        vehicle.accuracy <= 50 ? 'bg-success-100 text-success-800' :
+                        vehicle.accuracy <= 100 ? 'bg-warning-100 text-warning-800' :
+                        'bg-danger-100 text-danger-800'
+                      }`}>
+                        {vehicle.accuracy ? `${vehicle.accuracy}m` : 'N/A'}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center py-1">
                       <span className="font-medium text-secondary-600">Status:</span>
