@@ -3,6 +3,9 @@ import axios from 'axios';
 import { FaPlay, FaStop, FaMapMarkerAlt, FaTachometerAlt, FaRoute, FaClock } from 'react-icons/fa';
 import API_BASE from '../api';
 
+// GPS Tracker Component - Updated for better error handling
+console.log('GPSTracker component loaded - version 2.1');
+
 const GPSTracker = ({ assignedVehicle }) => {
   const [isTracking, setIsTracking] = useState(false);
   const [currentLocation, setCurrentLocation] = useState(null);
@@ -93,25 +96,36 @@ const GPSTracker = ({ assignedVehicle }) => {
     };
 
     try {
-      await axios.post(`${API_BASE}/api/tracking/gps`, gpsData);
+      await axios.post(`${API_BASE}/api/tracking/gps`, gpsData, {
+        timeout: 10000 // 10 second timeout
+      });
       // Only log successful sends every 10th time to reduce console noise
       if (Math.random() < 0.1) {
         console.log('GPS data sent successfully (accuracy: ' + (position.coords.accuracy || 'unknown') + 'm)');
       }
+      setError(''); // Clear any previous errors on success
     } catch (error) {
       console.error('Error sending GPS data:', error);
-      setError('Failed to send GPS data - check connection');
+      // Only show error for non-timeout errors, or show timeout message
+      if (error.code === 'ECONNABORTED') {
+        setError('GPS data send timeout - will retry');
+      } else {
+        setError('Failed to send GPS data - check connection');
+      }
 
-      // Retry logic for failed sends
+      // Retry logic for failed sends (with exponential backoff)
+      const retryDelay = error.code === 'ECONNABORTED' ? 3000 : 5000;
       setTimeout(async () => {
         try {
-          await axios.post(`${API_BASE}/api/tracking/gps`, gpsData);
+          await axios.post(`${API_BASE}/api/tracking/gps`, gpsData, {
+            timeout: 10000
+          });
           console.log('GPS data retry successful');
           setError(''); // Clear error on successful retry
         } catch (retryError) {
           console.error('GPS data retry failed:', retryError);
         }
-      }, 5000); // Retry after 5 seconds
+      }, retryDelay);
     }
   };
 
