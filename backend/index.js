@@ -46,6 +46,7 @@ const vehicleRoutes = require('./routes/vehicles');
 const trackingRoutes = require('./routes/tracking');
 const maintenanceRoutes = require('./routes/maintenance');
 const alertRoutes = require('./routes/alerts');
+const analyticsRoutes = require('./routes/analytics');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -53,6 +54,7 @@ app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/tracking', trackingRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/alerts', alertRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 app.get('/', (req, res) => {
   res.json({ message: 'Vehicle Tracking Management System API' });

@@ -2,6 +2,7 @@ const express = require('express');
 const axios = require('axios');
 const pool = require('../db');
 const { authenticateToken, authorizeRoles } = require('../middleware/auth');
+const gpsQuality = require('../gps-quality');
 
 const router = express.Router();
 
@@ -98,31 +99,45 @@ router.post('/gps', authenticateToken, authorizeRoles('driver'), async (req, res
       return res.status(403).json({ message: 'Not authorized for this vehicle' });
     }
 
-    // GPS data quality validation
-    let quality_score = 'good';
-    if (accuracy > 100) quality_score = 'fair';
-    if (accuracy > 500) quality_score = 'poor';
-
     const gpsTimestamp = timestamp ? new Date(timestamp) : new Date();
 
-    // Check for unrealistic position jumps (anti-spoofing)
+    // Get previous GPS data for quality validation
     const lastPosition = await pool.query(
-      'SELECT latitude, longitude, timestamp FROM gps_data WHERE vehicle_id = $1 ORDER BY timestamp DESC LIMIT 1',
+      'SELECT latitude, longitude, speed, timestamp FROM gps_data WHERE vehicle_id = $1 ORDER BY timestamp DESC LIMIT 1',
       [vehicle_id]
     );
 
-    if (lastPosition.rows.length > 0) {
-      const lastPos = lastPosition.rows[0];
-      const timeDiff = (gpsTimestamp - new Date(lastPos.timestamp)) / 1000; // seconds
-      const distance = calculateDistance(latitude, longitude, lastPos.latitude, lastPos.longitude);
-      const speedCheck = distance / (timeDiff / 3600); // km/h
+    // Prepare GPS data for quality validation
+    const gpsDataForValidation = {
+      latitude,
+      longitude,
+      speed,
+      heading,
+      accuracy,
+      altitude,
+      timestamp: gpsTimestamp
+    };
 
-      // Flag suspicious jumps (over 200 km/h instantaneous speed)
-      if (speedCheck > 200 && timeDiff < 300) { // Within 5 minutes
-        console.warn(`Suspicious GPS jump detected for vehicle ${vehicle_id}: ${speedCheck.toFixed(1)} km/h over ${timeDiff}s`);
-        // Still allow the data but log it
-      }
+    // Validate GPS data quality
+    const qualityValidation = gpsQuality.validateGPSData(
+      gpsDataForValidation,
+      lastPosition.rows.length > 0 ? {
+        latitude: lastPosition.rows[0].latitude,
+        longitude: lastPosition.rows[0].longitude,
+        speed: lastPosition.rows[0].speed,
+        timestamp: lastPosition.rows[0].timestamp
+      } : null
+    );
+
+    // Log quality issues
+    if (qualityValidation.issues.length > 0) {
+      console.warn(`GPS quality issues for vehicle ${vehicle_id}:`, qualityValidation.issues);
     }
+
+    // Determine quality score
+    let quality_score = 'good';
+    if (qualityValidation.qualityScore < 60) quality_score = 'poor';
+    else if (qualityValidation.qualityScore < 80) quality_score = 'fair';
 
     const result = await pool.query(
       `INSERT INTO gps_data (vehicle_id, latitude, longitude, speed, heading, accuracy, altitude, altitude_accuracy, timestamp)
@@ -140,31 +155,20 @@ router.post('/gps', authenticateToken, authorizeRoles('driver'), async (req, res
       heading,
       accuracy,
       quality_score,
+      quality_details: qualityValidation,
       timestamp: gpsTimestamp
     });
 
     res.status(201).json({
       ...result.rows[0],
-      quality_score
+      quality_score,
+      quality_validation: qualityValidation
     });
   } catch (error) {
     console.error('Add GPS data error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
-
-// Helper function for distance calculation
-function calculateDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371; // Earth's radius in kilometers
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon1 - lon2) * Math.PI / 180;
-  const a =
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c; // Distance in kilometers
-}
 
 // Get latest position for all vehicles
 router.get('/latest', authenticateToken, async (req, res) => {
