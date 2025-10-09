@@ -254,8 +254,8 @@ const Map = () => {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Sidebar */}
+    <div className="flex flex-col lg:flex-row h-screen overflow-hidden">
+      {/* Sidebar - Hidden on mobile, shown on desktop */}
       <div className="hidden lg:block w-80 bg-white shadow-soft overflow-y-auto border border-secondary-100">
         <div className="p-6 border-b border-secondary-100">
           <h2 className="text-xl font-semibold text-secondary-800">Vehicle Status</h2>
@@ -305,19 +305,27 @@ const Map = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        <div className="p-6">
-          <h1 className="text-3xl font-bold text-secondary-900">Map View</h1>
-          <p className="text-secondary-600 mt-1">Real-time vehicle tracking and route visualization</p>
+      <div className="flex-1 flex flex-col min-h-0">
+        {/* Header - Compact on mobile */}
+        <div className="p-3 sm:p-4 lg:p-6 bg-white border-b border-secondary-100">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+            <div>
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-secondary-900">Map View</h1>
+              <p className="text-secondary-600 text-sm lg:text-base mt-1">Real-time vehicle tracking and route visualization</p>
+            </div>
+            {/* Mobile vehicle count - shown only on mobile */}
+            <div className="lg:hidden text-sm text-secondary-600 bg-secondary-50 px-3 py-2 rounded-lg">
+              {vehicles.length} vehicles • {vehicles.filter(v => v.status === 'active').length} active
+            </div>
+          </div>
         </div>
 
-      <div className="bg-white p-6 rounded-2xl shadow-soft border border-secondary-100 mx-6 mb-6">
-        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-            <span className="text-sm text-secondary-600 font-medium">
-              Showing {vehicles.length} vehicles on map ({allVehicles.length} total)
-            </span>
-            <div className="flex items-center space-x-4 text-xs">
+      {/* Controls Section - Collapsible on mobile */}
+      <div className="bg-white border-b border-secondary-100 lg:border lg:rounded-2xl lg:shadow-soft lg:mx-6 lg:mb-6">
+        <div className="p-3 sm:p-4 lg:p-6">
+          {/* Status and Refresh - Always visible */}
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+            <div className="hidden lg:flex items-center space-x-4 text-xs">
               <div className="flex items-center space-x-1">
                 <div className="w-3 h-3 bg-success-500 rounded-full"></div>
                 <span className="text-secondary-700">Active</span>
@@ -331,108 +339,111 @@ const Map = () => {
                 <span className="text-secondary-700">Maintenance</span>
               </div>
             </div>
-          </div>
-          <button
-            onClick={fetchVehicleLocations}
-            className="bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white px-6 py-3 rounded-xl font-medium transition-all duration-200 shadow-medium hover:shadow-large hover:scale-105"
-          >
-            Refresh Data
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 items-end">
-          <div>
-            <label className="block text-sm font-semibold text-secondary-700 mb-2">Vehicle</label>
-            <select
-              value={selectedVehicle}
-              onChange={(e) => setSelectedVehicle(e.target.value)}
-              className="w-full border border-secondary-300 rounded-xl shadow-sm p-3 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200 bg-secondary-50 focus:bg-white"
-            >
-              <option value="">Select Vehicle</option>
-              {allVehicles.map((vehicle) => (
-                <option key={vehicle.id} value={vehicle.id}>
-                  {vehicle.license_plate} - {vehicle.vehicle_id} ({vehicle.driver_name || 'Unassigned'})
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-secondary-700 mb-2">Date</label>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="w-full border border-secondary-300 rounded-xl shadow-sm p-3 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200 bg-secondary-50 focus:bg-white"
-            />
-          </div>
-          <div className="flex space-x-2">
             <button
-              onClick={fetchRoute}
-              className="bg-gradient-to-r from-success-500 to-success-600 hover:from-success-600 hover:to-success-700 text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 shadow-medium hover:shadow-large hover:scale-105 text-sm"
+              onClick={fetchVehicleLocations}
+              className="bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-lg sm:rounded-xl font-medium transition-all duration-200 shadow-medium hover:shadow-large hover:scale-105 text-sm"
             >
-              Show Route
+              Refresh Data
             </button>
-            {showRoute && (
-              <button
-                onClick={clearRoute}
-                className="bg-gradient-to-r from-danger-500 to-danger-600 hover:from-danger-600 hover:to-danger-700 text-white px-4 py-3 rounded-xl font-medium transition-all duration-200 shadow-medium hover:shadow-large hover:scale-105 text-sm"
+          </div>
+
+          {/* Controls Grid - Responsive */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4">
+            <div className="sm:col-span-2 lg:col-span-1">
+              <label className="block text-xs sm:text-sm font-semibold text-secondary-700 mb-1 sm:mb-2">Vehicle</label>
+              <select
+                value={selectedVehicle}
+                onChange={(e) => setSelectedVehicle(e.target.value)}
+                className="w-full border border-secondary-300 rounded-lg sm:rounded-xl shadow-sm p-2 sm:p-3 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200 bg-secondary-50 focus:bg-white text-sm"
               >
-                Clear Route
+                <option value="">Select Vehicle</option>
+                {allVehicles.map((vehicle) => (
+                  <option key={vehicle.id} value={vehicle.id}>
+                    {vehicle.license_plate} - {vehicle.vehicle_id}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="sm:col-span-2 lg:col-span-1">
+              <label className="block text-xs sm:text-sm font-semibold text-secondary-700 mb-1 sm:mb-2">Date</label>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="w-full border border-secondary-300 rounded-lg sm:rounded-xl shadow-sm p-2 sm:p-3 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200 bg-secondary-50 focus:bg-white text-sm"
+              />
+            </div>
+            <div className="flex space-x-2 items-end">
+              <button
+                onClick={fetchRoute}
+                className="flex-1 bg-gradient-to-r from-success-500 to-success-600 hover:from-success-600 hover:to-success-700 text-white px-3 py-2 sm:px-4 sm:py-3 rounded-lg sm:rounded-xl font-medium transition-all duration-200 shadow-medium hover:shadow-large hover:scale-105 text-xs sm:text-sm"
+              >
+                Show Route
               </button>
-            )}
+              {showRoute && (
+                <button
+                  onClick={clearRoute}
+                  className="flex-1 bg-gradient-to-r from-danger-500 to-danger-600 hover:from-danger-600 hover:to-danger-700 text-white px-3 py-2 sm:px-4 sm:py-3 rounded-lg sm:rounded-xl font-medium transition-all duration-200 shadow-medium hover:shadow-large hover:scale-105 text-xs sm:text-sm"
+                >
+                  Clear Route
+                </button>
+              )}
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="geofence-toggle"
+                checked={showGeofences}
+                onChange={(e) => setShowGeofences(e.target.checked)}
+                className="w-3 h-3 sm:w-4 sm:h-4 text-primary-600 bg-secondary-100 border-secondary-300 rounded focus:ring-primary-500 focus:ring-2"
+              />
+              <label htmlFor="geofence-toggle" className="text-xs sm:text-sm font-medium text-secondary-700">
+                Geofences
+              </label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="live-tracking"
+                checked={liveTracking}
+                onChange={(e) => setLiveTracking(e.target.checked)}
+                className="w-3 h-3 sm:w-4 sm:h-4 text-primary-600 bg-secondary-100 border-secondary-300 rounded focus:ring-primary-500 focus:ring-2"
+              />
+              <label htmlFor="live-tracking" className="text-xs sm:text-sm font-medium text-secondary-700">
+                Live Tracking
+              </label>
+            </div>
+            <div className="flex items-end">
+              <button
+                onClick={() => setGeofenceMode(!geofenceMode)}
+                className={`w-full px-3 py-2 sm:px-4 sm:py-3 rounded-lg sm:rounded-xl font-medium transition-all duration-200 shadow-medium hover:shadow-large hover:scale-105 text-xs sm:text-sm ${
+                  geofenceMode
+                    ? 'bg-gradient-to-r from-warning-500 to-warning-600 hover:from-warning-600 hover:to-warning-700 text-white'
+                    : 'bg-gradient-to-r from-secondary-500 to-secondary-600 hover:from-secondary-600 hover:to-secondary-700 text-white'
+                }`}
+              >
+                {geofenceMode ? 'Exit Geofence Mode' : 'Create Geofence'}
+              </button>
+            </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              id="geofence-toggle"
-              checked={showGeofences}
-              onChange={(e) => setShowGeofences(e.target.checked)}
-              className="w-4 h-4 text-primary-600 bg-secondary-100 border-secondary-300 rounded focus:ring-primary-500 focus:ring-2"
-            />
-            <label htmlFor="geofence-toggle" className="text-sm font-medium text-secondary-700">
-              Geofences
-            </label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              id="live-tracking"
-              checked={liveTracking}
-              onChange={(e) => setLiveTracking(e.target.checked)}
-              className="w-4 h-4 text-primary-600 bg-secondary-100 border-secondary-300 rounded focus:ring-primary-500 focus:ring-2"
-            />
-            <label htmlFor="live-tracking" className="text-sm font-medium text-secondary-700">
-              Live Tracking
-            </label>
-          </div>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setGeofenceMode(!geofenceMode)}
-              className={`px-4 py-3 rounded-xl font-medium transition-all duration-200 shadow-medium hover:shadow-large hover:scale-105 text-sm ${
-                geofenceMode
-                  ? 'bg-gradient-to-r from-warning-500 to-warning-600 hover:from-warning-600 hover:to-warning-700 text-white'
-                  : 'bg-gradient-to-r from-secondary-500 to-secondary-600 hover:from-secondary-600 hover:to-secondary-700 text-white'
-              }`}
-            >
-              {geofenceMode ? 'Exit Geofence Mode' : 'Create Geofence'}
-            </button>
-          </div>
-        </div>
 
-        {geofenceMode && (
-          <div className="mt-6 p-4 bg-warning-50 border border-warning-200 rounded-xl">
-            <p className="text-sm text-warning-800 font-medium">
-              <strong>Geofence Mode:</strong> Click on the map to create geofence points. Right-click to complete the geofence.
-            </p>
-          </div>
-        )}
+          {geofenceMode && (
+            <div className="mt-4 p-3 sm:p-4 bg-warning-50 border border-warning-200 rounded-lg sm:rounded-xl">
+              <p className="text-xs sm:text-sm text-warning-800 font-medium">
+                <strong>Geofence Mode:</strong> Click on the map to create geofence points. Right-click to complete the geofence.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-soft border border-secondary-100 mx-6" style={{ height: '600px' }}>
+      {/* Map Container - Takes remaining space */}
+      <div className="flex-1 bg-white lg:rounded-2xl lg:shadow-soft lg:border lg:border-secondary-100 lg:mx-6 lg:mb-6 min-h-0">
         <MapContainer
           center={[20.5937, 78.9629]} // Center of India
           zoom={5}
           style={{ height: '100%', width: '100%' }}
+          className="lg:rounded-2xl"
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
