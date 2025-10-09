@@ -106,6 +106,13 @@ const TrackingScreen = () => {
   const getCurrentLocation = () => {
     Geolocation.getCurrentPosition(
       (position) => {
+        // Check if position.coords exists
+        if (!position || !position.coords) {
+          console.error('Invalid position data received in getCurrentLocation');
+          Alert.alert('Location Error', 'Received invalid location data. Please try again.');
+          return;
+        }
+
         const { latitude, longitude, speed: currentSpeed } = position.coords;
         const newLocation = {
           latitude,
@@ -205,6 +212,12 @@ const TrackingScreen = () => {
   };
 
   const handleLocationUpdate = async (position) => {
+    // Check if position.coords exists
+    if (!position || !position.coords) {
+      console.error('Invalid position data received in handleLocationUpdate');
+      return;
+    }
+
     const { latitude, longitude, speed: currentSpeed, accuracy } = position.coords;
 
     const newLocation = {
